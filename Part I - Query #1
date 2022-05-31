@@ -1,0 +1,75 @@
+-- step 1 - Creation of BreakfastTable
+CREATE TABLE efood2022.main_assessment.BreakfastTable AS
+SELECT OT.city as city, 
+       sum(OT.amount)/count(OT.order_id) as breakfast_basket,
+       count(OT.order_id)/count(distinct(OT.user_id)) as breakfast_freq,
+       count(OT.order_id) as breakfast_orders,
+       count(distinct(OT.user_id)) as total_breakfast_users
+FROM efood2022.main_assessment.orders OT
+WHERE cuisine ='Breakfast'
+GROUP BY OT.city
+ORDER BY count(OT.order_id) DESC;
+
+-- step 2 - Creation of BreakfastUsersTable
+CREATE TABLE efood2022.main_assessment.BreakfastUsers AS
+SELECT OT.city,
+       OT.user_id as breakfast_users_3orders_plus
+FROM efood2022.main_assessment.orders OT
+WHERE cuisine ='Breakfast'
+GROUP BY OT.city, OT.user_id
+HAVING count(OT.order_id) > 3
+ORDER BY city;
+
+-- step 2a – Creation of BreakfastUsers_3plus
+CREATE TABLE efood2022.main_assessment.Breakfast_users_3plus AS
+SELECT BUT.city as city,
+       count(distinct(BUT.breakfast_users_3orders_plus)) as N_breakfast_users_3orders_plus
+FROM `efood2022.main_assessment.BreakfastUsers` BUT
+GROUP BY BUT.city
+ORDER BY BUT.city;
+
+-- step 3 - Creation of AllCuisinesTable
+CREATE TABLE efood2022.main_assessment.AllCuisinesTable AS
+SELECT OT.city as city, 
+       sum(OT.amount)/count(OT.order_id) as efood_basket,
+       count(OT.order_id)/count(distinct(OT.user_id)) as efood_freq,
+       count(distinct(OT.user_id)) as total_users,
+       count(distinct(OT.order_id)) as total_orders
+FROM efood2022.main_assessment.orders OT
+GROUP BY OT.city
+HAVING count(OT.order_id) > 1000
+ORDER BY count(OT.order_id) DESC;
+
+--  step 4 - Creation of AllCuisinesUsersView
+CREATE OR REPLACE VIEW efood2022.main_assessment.AllCuisines_users_3plus_view AS
+SELECT OT.city as city, 
+       OT.user_id as allcuisines_users_3orders_plus
+FROM efood2022.main_assessment.orders OT
+GROUP BY OT.city, OT.user_id
+HAVING count(OT.order_id) > 3
+ORDER BY city;
+
+-- step 4a - Creation of AllCuisinesUsers_3plus
+CREATE TABLE efood2022.main_assessment.AllCuisines_users_3plus AS
+SELECT ACV3.city as city,
+       count(distinct(ACV3.allcuisines_users_3orders_plus)) as N_AllCuisines_users_3orders_plus
+FROM `efood2022.main_assessment.AllCuisines_users_3plus_view` ACV3
+GROUP BY ACV3.city
+ORDER BY ACV3.city;
+
+-- step 5 Final – Deliverable 
+CREATE TABLE efood2022.main_assessment.FinalTable AS
+SELECT BT.city,
+       BT.breakfast_basket,
+       ACT.efood_basket,
+       BT.breakfast_freq,
+       ACT.efood_freq,
+       (BUT3.N_breakfast_users_3orders_plus/BT.total_breakfast_users) as breakfast_users3freq_pec,
+       (ACU3.N_AllCuisines_users_3orders_plus/ACT.total_users) as efood_users3freq_perc
+FROM  ((efood2022.main_assessment.Breakfast_users_3plus BUT3 INNER JOIN 
+      efood2022.main_assessment.AllCuisinesTable ACT ON BUT3.city = ACT.city) INNER JOIN
+      efood2022.main_assessment.AllCuisines_users_3plus ACU3 ON ACU3.city = ACT.city) INNER JOIN
+      efood2022.main_assessment.BreakfastTable BT ON ACT.city = BT.city
+ORDER BY BT.breakfast_orders DESC
+LIMIT 5;
+
